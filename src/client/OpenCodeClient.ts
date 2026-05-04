@@ -27,6 +27,12 @@ type OpenCodeSession = {
   id?: string;
 };
 
+export type OpenCodeSessionInfo = {
+  id: string;
+  title: string;
+  updatedAt: string;
+};
+
 type OpenCodeResponse<T> = T | { data?: T } | { message?: T } | null;
 
 export class OpenCodeClient {
@@ -100,6 +106,41 @@ export class OpenCodeClient {
     });
     const session = this.unwrap(result);
     return session?.id ?? null;
+  }
+
+  async listSessions(): Promise<OpenCodeSessionInfo[]> {
+    try {
+      const url = `${this.apiBaseUrl}/session?directory=${encodeURIComponent(this.projectDirectory)}`;
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "x-opencode-directory": this.projectDirectory,
+        },
+      });
+
+      if (!response.ok) {
+        console.error("[OpenCode] Failed to list sessions:", response.status);
+        return [];
+      }
+
+      const body = await response.json().catch(() => null);
+      const data = (body?.data ?? body?.sessions ?? body ?? []) as any[];
+
+      if (!Array.isArray(data)) {
+        return [];
+      }
+
+      return data
+        .map((s: any) => ({
+          id: s.id ?? "",
+          title: s.title ?? s.info?.title ?? s.id ?? "Untitled",
+          updatedAt: s.updatedAt ?? s.info?.updated ?? "",
+        }))
+        .filter((s: OpenCodeSessionInfo) => s.id);
+    } catch (error) {
+      console.error("[OpenCode] listSessions error:", error);
+      return [];
+    }
   }
 
   async updateContext(params: {

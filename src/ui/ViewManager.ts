@@ -1,7 +1,7 @@
 import { App, WorkspaceLeaf } from "obsidian";
 import { OPENCODE_VIEW_TYPE, OpenCodeSettings } from "../types";
 import { OpenCodeView } from "./OpenCodeView";
-import { OpenCodeClient } from "../client/OpenCodeClient";
+import { OpenCodeClient, OpenCodeSessionInfo } from "../client/OpenCodeClient";
 import { ContextManager } from "../context/ContextManager";
 import { ServerState } from "../server/types";
 
@@ -18,7 +18,7 @@ type ViewManagerDeps = {
 export class ViewManager {
   private app: App;
   private settings: OpenCodeSettings;
-  private client: OpenCodeClient;
+  client: OpenCodeClient;
   private contextManager: ContextManager;
   private getCachedIframeUrl: () => string | null;
   private setCachedIframeUrl: (url: string | null) => void;
@@ -116,5 +116,15 @@ export class ViewManager {
     if (this.app.workspace.activeLeaf === view.leaf) {
       await this.contextManager.refreshContextForView(view);
     }
+  }
+
+  async listSessions(): Promise<OpenCodeSessionInfo[]> {
+    return this.client.listSessions();
+  }
+
+  switchSession(view: OpenCodeView, sessionId: string): void {
+    const sessionUrl = this.client.getSessionUrl(sessionId);
+    this.setCachedIframeUrl(sessionUrl);
+    view.setIframeUrl(sessionUrl);
   }
 }

@@ -15,7 +15,7 @@ export default class OpenCodePlugin extends Plugin {
   private stateChangeCallbacks: Array<(state: ServerState) => void> = [];
   private openCodeClient: OpenCodeClient;
   private contextManager: ContextManager;
-  private viewManager: ViewManager;
+  viewManager: ViewManager;
   private cachedIframeUrl: string | null = null;
   private lastBaseUrl: string | null = null;
 

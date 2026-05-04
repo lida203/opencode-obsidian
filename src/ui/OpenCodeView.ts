@@ -3,12 +3,15 @@ import { OPENCODE_VIEW_TYPE } from "../types";
 import { OPENCODE_ICON_NAME } from "../icons";
 import type OpenCodePlugin from "../main";
 import type { ServerState } from "../server/types";
+import type { OpenCodeSessionInfo } from "../client/OpenCodeClient";
 
 export class OpenCodeView extends ItemView {
   plugin: OpenCodePlugin;
   private iframeEl: HTMLIFrameElement | null = null;
   private currentState: ServerState = "stopped";
   private unsubscribeStateChange: (() => void) | null = null;
+  private sessionDropdown: HTMLSelectElement | null = null;
+  private sessions: OpenCodeSessionInfo[] = [];
 
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodePlugin) {
     super(leaf);
@@ -136,6 +139,31 @@ export class OpenCodeView extends ItemView {
 
     const actionsEl = headerEl.createDiv({ cls: "opencode-header-actions" });
 
+    const newButton = actionsEl.createEl("button", {
+      attr: { "aria-label": "New session", title: "New session" },
+    });
+    setIcon(newButton, "plus-circle");
+    newButton.addEventListener("click", async () => {
+      await this.plugin.ensureSessionUrl(this);
+      await this.refreshSessionList();
+    });
+
+    this.sessionDropdown = actionsEl.createEl("select", {
+      cls: "opencode-session-select",
+      attr: { "aria-label": "Switch session", title: "Switch session" },
+    });
+    this.sessionDropdown.addEventListener("change", () => {
+      const sessionId = this.sessionDropdown?.value;
+      if (sessionId) {
+        this.plugin.viewManager.switchSession(this, sessionId);
+      }
+    });
+
+    this.sessionDropdown.createEl("option", {
+      text: "Loading sessions...",
+      value: "",
+    });
+
     const reloadButton = actionsEl.createEl("button", {
       attr: { "aria-label": "Reload" },
     });
@@ -181,6 +209,7 @@ export class OpenCodeView extends ItemView {
     });
 
     void this.plugin.ensureSessionUrl(this);
+    void this.refreshSessionList();
   }
 
   getIframeUrl(): string | null {
@@ -248,6 +277,40 @@ export class OpenCodeView extends ItemView {
           this.iframeEl.src = src;
         }
       }, 100);
+    }
+  }
+
+  async refreshSessionList(): Promise<void> {
+    const sessions = await this.plugin.viewManager.listSessions();
+    this.sessions = sessions;
+    this.updateSessionDropdown();
+  }
+
+  private updateSessionDropdown(): void {
+    if (!this.sessionDropdown) {
+      return;
+    }
+
+    const currentId = this.plugin.getStoredIframeUrl()
+      ? this.plugin.viewManager.client.resolveSessionId(this.plugin.getStoredIframeUrl() ?? "")
+      : null;
+
+    this.sessionDropdown.empty();
+
+    this.sessionDropdown.createEl("option", {
+      text: `Sessions (${this.sessions.length})`,
+      value: "",
+      attr: { disabled: "" },
+    });
+
+    for (const session of this.sessions) {
+      const option = this.sessionDropdown.createEl("option", {
+        text: session.title || session.id,
+        value: session.id,
+      });
+      if (session.id === currentId) {
+        option.selected = true;
+      }
     }
   }
 }
